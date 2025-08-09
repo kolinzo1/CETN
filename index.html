@@ -1344,31 +1344,82 @@ document.getElementById('event-form').addEventListener('submit', async function(
 async function loadEvents() {
     try {
         const res = await fetch(`${API_URL}/api/events`);
-        const events = await res.json();
+        if (!res.ok) {
+            throw new Error(`Network response was not ok: ${res.statusText}`);
+        }
         
+        const events = await res.json();
         const container = document.getElementById('events-container');
         if (!container) return;
-        container.innerHTML = '';
         
+        container.innerHTML = '';
+
+        // Add a check to ensure we have an array before trying to sort
+        if (!Array.isArray(events)) {
+            console.error("Data received from /api/events is not an array:", events);
+            return;
+        }
+        
+        // No need to sort here, the backend already sorts by date
         events.forEach(event => {
-            // ... same logic to create the event card HTML ...
+            // FIX: Use 'event_date' and 'event_time' to match the database
+            const eventDate = new Date(event.event_date + 'T00:00:00'); 
+            const formattedDate = eventDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const formattedTime = new Date(`1970-01-01T${event.event_time}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            
+            const eventCard = document.createElement('div');
+            eventCard.className = 'event-card';
+            eventCard.innerHTML = `
+                <div class="event-date">${formattedDate}</div>
+                <h3>${event.title}</h3>
+                <p><i class="fas fa-clock"></i> ${formattedTime}</p>
+                <p>${event.description}</p>
+            `;
+            container.appendChild(eventCard);
         });
     } catch (err) {
-        console.error('Failed to load events:', err);
+        console.error('Error loading events:', err);
     }
 }
 
-function loadAdminEvents() {
+
+async function loadAdminEvents() {
     const container = document.getElementById('events-list');
     if (!container) return;
-    container.innerHTML = '<h4>Current Events</h4>';
-    const sortedEvents = events.sort((a, b) => new Date(a.date) - new Date(b.date));
-    sortedEvents.forEach(event => {
-        const eventDiv = document.createElement('div');
-        eventDiv.style.cssText = 'background: var(--gray-light); padding: 1rem; margin: 0.5rem 0; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;';
-        eventDiv.innerHTML = `<div><strong>${event.title}</strong><br><small>${event.date} at ${event.time}</small></div><button onclick="deleteEvent(${event.id})" style="background: #ef4444; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer;">Delete</button>`;
-        container.appendChild(eventDiv);
-    });
+
+    try {
+        const token = localStorage.getItem('cetn_token');
+        const res = await fetch(`${API_URL}/api/events`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch admin events');
+        
+        const events = await res.json();
+        container.innerHTML = '<h4>Current Events</h4>';
+
+        if (!Array.isArray(events)) {
+            console.error("Data received for admin events is not an array:", events);
+            return;
+        }
+        
+        events.forEach(event => {
+            const eventDiv = document.createElement('div');
+            eventDiv.style.cssText = 'background: var(--gray-light); padding: 1rem; margin: 0.5rem 0; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;';
+            
+            // FIX: Use 'event_date' and 'event_time'
+            eventDiv.innerHTML = `
+                <div>
+                    <strong>${event.title}</strong><br>
+                    <small>${event.event_date} at ${event.event_time}</small>
+                </div>
+                <button onclick="deleteEvent(${event.id})" style="background: #ef4444; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer;">Delete</button>
+            `;
+            container.appendChild(eventDiv);
+        });
+    } catch(err) {
+        console.error("Could not load admin events:", err);
+        container.innerHTML = '<h4>Could not load events.</h4>';
+    }
 }
 
 async function deleteEvent(eventId) {
