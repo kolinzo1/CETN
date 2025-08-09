@@ -1072,6 +1072,7 @@
         // Initialize website
     document.addEventListener('DOMContentLoaded', function() {
         loadEvents();
+        loadSiteSettings();
     
     // Smooth scrolling for navigation links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -1363,7 +1364,7 @@ async function loadEvents() {
         // No need to sort here, the backend already sorts by date
         events.forEach(event => {
             // FIX: Use 'event_date' and 'event_time' to match the database
-            const eventDate = new Date(event.event_date + 'T00:00:00'); 
+            const eventDate = new Date(event.event_date.replace(/-/g, '/')); 
             const formattedDate = eventDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             const formattedTime = new Date(`1970-01-01T${event.event_time}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             
@@ -1445,6 +1446,34 @@ async function deleteEvent(eventId) {
     }
 }
 
+async function loadSiteSettings() {
+    try {
+        const res = await fetch(`${API_URL}/api/settings`);
+        if (!res.ok) throw new Error('Could not fetch site settings.');
+
+        const settings = await res.json();
+
+        // Update the Footer
+        const footerInfo = document.querySelector('.footer-section:first-child');
+        if (footerInfo) {
+            footerInfo.innerHTML = `
+                <h3>Contact Info</h3>
+                <p><i class="fas fa-map-marker-alt"></i> ${settings.church_address}</p>
+                <p><i class="fas fa-phone"></i> ${settings.church_phone}</p>
+                <p><i class="fas fa-envelope"></i> ${settings.church_email}</p>
+            `;
+        }
+
+        // Update the form fields in the Admin Panel
+        document.getElementById('church-phone').value = settings.church_phone;
+        document.getElementById('church-email').value = settings.church_email;
+        document.getElementById('church-address').value = settings.church_address;
+
+    } catch (err) {
+        console.error("Error loading settings:", err);
+    }
+}
+
 function handleContactSubmit(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -1507,12 +1536,39 @@ function deleteMessage(messageId) {
     }
 }
 
-function saveSettings() {
-    settings.phone = document.getElementById('church-phone').value;
-    settings.email = document.getElementById('church-email').value;
-    settings.address = document.getElementById('church-address').value;
-    updateFooterInfo();
-    showNotification('Settings saved successfully!', 'success');
+async function saveSettings() {
+    const token = localStorage.getItem('cetn_token');
+    if (!token) {
+        showNotification('Authentication error. Please log in again.', 'warning');
+        return;
+    }
+
+    const updatedSettings = {
+        church_phone: document.getElementById('church-phone').value,
+        church_email: document.getElementById('church-email').value,
+        church_address: document.getElementById('church-address').value
+    };
+
+    try {
+        const res = await fetch(`${API_URL}/api/settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(updatedSettings)
+        });
+
+        if (!res.ok) throw new Error('Failed to save settings.');
+
+        showNotification('Settings saved successfully!', 'success');
+        // Reload the settings to reflect changes everywhere
+        loadSiteSettings();
+
+    } catch (err) {
+        console.error("Save settings error:", err);
+        showNotification(err.message, 'warning');
+    }
 }
 
 function updateFooterInfo() {
