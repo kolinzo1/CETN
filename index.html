@@ -1072,7 +1072,6 @@
         // Initialize website
     document.addEventListener('DOMContentLoaded', function() {
         loadEvents();
-       /* loadMessages(); */
     
     // Smooth scrolling for navigation links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -1293,20 +1292,53 @@ function switchTab(event, tabName) {
     event.target.classList.add('active');
 }
 
-document.getElementById('event-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const newEvent = {
-        id: Date.now(),
+// FIND AND REPLACE THE OLD 'event-form' LISTENER WITH THIS NEW ONE
+
+document.getElementById('event-form').addEventListener('submit', async function(e) {
+    e.preventDefault(); // Prevent the form from reloading the page
+
+    const token = localStorage.getItem('cetn_token'); // Get the auth token
+    if (!token) {
+        showNotification('Authentication error. Please log in again.', 'warning');
+        return;
+    }
+
+    // Gather the data from the form
+    const eventData = {
         title: document.getElementById('event-title').value,
         date: document.getElementById('event-date').value,
         time: document.getElementById('event-time').value,
         description: document.getElementById('event-description').value
     };
-    events.push(newEvent);
-    loadEvents();
-    loadAdminEvents();
-    this.reset();
-    showNotification('Event added successfully!', 'success');
+
+    try {
+        const response = await fetch(`${API_URL}/api/events`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` // Include the token for private routes
+            },
+            body: JSON.stringify(eventData)
+        });
+
+        if (!response.ok) {
+            // If the server responds with an error, show it
+            const errorResult = await response.json();
+            throw new Error(errorResult.msg || 'Failed to add event.');
+        }
+
+        // If successful:
+        this.reset(); // Clear the form
+        showNotification('Event added successfully!', 'success');
+        
+        // Refresh the event lists to show the new event
+        loadEvents(); 
+        loadAdminEvents();
+
+    } catch (err) {
+        console.error('Add event error:', err);
+        showNotification(err.message, 'warning');
+    }
 });
 
 async function loadEvents() {
