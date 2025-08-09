@@ -1059,11 +1059,20 @@
     <div id="notification" class="notification"></div>
 
     <script>
-const API_URL = 'https://cetn-backend-cd17878a601d.herokuapp.com/';
-// Initialize website
-document.addEventListener('DOMContentLoaded', function() {
-    loadEvents();
-    loadMessages();
+        const API_URL = 'https://cetn-backend-cd17878a601d.herokuapp.com/';
+
+        let adminAuth = {
+        isLoggedIn: false,
+        username: '',
+        loginTime: null,
+        failedAttempts: 0,
+        lockoutTime: null,
+        sessionTimeout: 30 * 60 * 1000 // 30 minutes
+    };
+        // Initialize website
+    document.addEventListener('DOMContentLoaded', function() {
+        loadEvents();
+        loadMessages();
     
     // Smooth scrolling for navigation links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
